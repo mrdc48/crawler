@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Crawler</title>
+</head>
+<body>
+    <input type="text" id="urlInput" placeholder="Enter URL">
+    <button onclick="startCrawl()">Crawl</button>
+    <div id="results"></div>
+    <script>
+function startCrawl() {
+    const url = document.getElementById('urlInput').value;
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = "Crawling..."; // Indicate that crawling is happening
+
+    fetch(url)
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = doc.querySelectorAll('a');
+
+            // URL Counter
+            let linkCount = 0; 
+
+            resultsDiv.innerHTML = '';  // Clear previous results
+           resultsDiv.innerHTML += `Found ${linkCount} Links: <br/>`; // Initialize display
+
+            links.forEach(link => {
+                resultsDiv.innerHTML += `${link.href} <br/>`;
+                linkCount++; // Increment counter for each link
+            });
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = "Error: Check console for details."; 
+            console.error('Error fetching or parsing:', error);
+        });
+}
+    </script>
+</body>
+</html>
