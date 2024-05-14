@@ -1,41 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Crawler</title>
+    <title>Web Crawler Visualization</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <input type="text" id="urlInput" placeholder="Enter URL">
-    <button onclick="startCrawl()">Crawl</button>
-    <div id="results"></div>
-    <script>
-function startCrawl() {
-    const url = document.getElementById('urlInput').value;
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = "Crawling..."; // Indicate that crawling is happening
+    <input type="text" id="urlInput" placeholder="Enter URL to crawl">
+    <input type="number" id="depthInput" value="1" min="1">
+    <button id="crawlButton">Crawl</button>
 
-    fetch(url)
-        .then(response => response.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const links = doc.querySelectorAll('a');
+    <div id="crawlerOutput">
+        <h2>Crawled URLs:</h2>
+        <ul id="urlList"></ul>
+    </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const urlInput = document.getElementById("urlInput");
+  const crawlButton = document.getElementById("crawlButton");
+  const urlList = document.getElementById("urlList");
+  const depthInput = document.getElementById("depthInput");
 
-            // URL Counter
-            let linkCount = 0; 
+  let pageCount = 0;
+  let baseUrl = "";
+  const visitedUrls = new Set(); // Set to track visited URLs
 
-            resultsDiv.innerHTML = '';  // Clear previous results
-           resultsDiv.innerHTML += `Found ${linkCount} Links: <br/>`; // Initialize display
+  crawlButton.addEventListener("click", () => {
+      pageCount = 0;
+      urlList.innerHTML = "";
+      visitedUrls.clear(); // Clear visited URLs when starting a new crawl
+      baseUrl = new URL(urlInput.value);
+      const maxDepth = parseInt(depthInput.value) || 1;
+      crawl(baseUrl.toString(), maxDepth, 0);
+  });
 
-            links.forEach(link => {
-                resultsDiv.innerHTML += `${link.href} <br/>`;
-                linkCount++; // Increment counter for each link
-            });
-        })
-        .catch(error => {
-            resultsDiv.innerHTML = "Error: Check console for details."; 
-            console.error('Error fetching or parsing:', error);
-        });
-}
-    </script>
+  async function crawl(url, maxDepth, currentDepth) {
+      if (currentDepth > maxDepth || visitedUrls.has(url)) return; // Check if URL has been visited
+      visitedUrls.add(url); // Mark the URL as visited
+
+      try {
+          const response = await fetch(url);
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          const listItem = document.createElement("li");
+          listItem.textContent = url;
+          urlList.appendChild(listItem);
+
+          pageCount++;
+          console.log("Crawled pages:", pageCount);
+
+          if (currentDepth < maxDepth) {
+              const links = doc.querySelectorAll("a");
+              for (const link of links) {
+                  const href = link.getAttribute("href");
+                  if (href) {
+                      const absoluteUrl = new URL(href, baseUrl);
+                      if (absoluteUrl.origin === baseUrl.origin && absoluteUrl.pathname.startsWith(baseUrl.pathname)) {
+                          crawl(absoluteUrl.toString(), maxDepth, currentDepth + 1);
+                      }
+                  }
+              }
+          }
+      } catch (error) {
+          console.error("Error crawling:", error);
+      }
+  }
+});
+
+</script>
 </body>
 </html>
