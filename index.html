@@ -2,7 +2,6 @@
 <html>
 <head>
     <title>Web Crawler Visualization</title>
-    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <input type="text" id="urlInput" placeholder="Enter URL to crawl">
@@ -15,57 +14,75 @@
     </div>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const urlInput = document.getElementById("urlInput");
-  const crawlButton = document.getElementById("crawlButton");
-  const urlList = document.getElementById("urlList");
-  const depthInput = document.getElementById("depthInput");
+    const urlInput = document.getElementById("urlInput");
+    const crawlButton = document.getElementById("crawlButton");
+    const urlList = document.getElementById("urlList");
+    const depthInput = document.getElementById("depthInput");
 
-  let pageCount = 0;
-  let baseUrl = "";
-  const visitedUrls = new Set(); // Set to track visited URLs
+    let pageCount = 0;
+    let baseUrl = "";
+    const visitedUrls = new Set();
 
-  crawlButton.addEventListener("click", () => {
-      pageCount = 0;
-      urlList.innerHTML = "";
-      visitedUrls.clear(); // Clear visited URLs when starting a new crawl
-      baseUrl = new URL(urlInput.value);
-      const maxDepth = parseInt(depthInput.value) || 1;
-      crawl(baseUrl.toString(), maxDepth, 0);
-  });
+    crawlButton.addEventListener("click", () => {
+        pageCount = 0;
+        urlList.innerHTML = "";
+        visitedUrls.clear();
 
-  async function crawl(url, maxDepth, currentDepth) {
-      if (currentDepth > maxDepth || visitedUrls.has(url)) return; // Check if URL has been visited
-      visitedUrls.add(url); // Mark the URL as visited
+        try {
+            baseUrl = new URL(urlInput.value);
+        } catch (error) {
+            console.error("Invalid URL:", error);
+            return;
+        }
 
-      try {
-          const response = await fetch(url);
-          const html = await response.text();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, "text/html");
+        const maxDepth = parseInt(depthInput.value) || 1;
+        crawl(baseUrl, maxDepth, 0);
+    });
 
-          const listItem = document.createElement("li");
-          listItem.textContent = url;
-          urlList.appendChild(listItem);
+    async function crawl(url, maxDepth, currentDepth) {
+        if (currentDepth > maxDepth || visitedUrls.has(url.toString())) return;
+        visitedUrls.add(url.toString()); // Store as string for consistent comparison
 
-          pageCount++;
-          console.log("Crawled pages:", pageCount);
+        try {
+            const response = await fetch(url);
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
 
-          if (currentDepth < maxDepth) {
-              const links = doc.querySelectorAll("a");
-              for (const link of links) {
-                  const href = link.getAttribute("href");
-                  if (href) {
-                      const absoluteUrl = new URL(href, baseUrl);
-                      if (absoluteUrl.origin === baseUrl.origin && absoluteUrl.pathname.startsWith(baseUrl.pathname)) {
-                          crawl(absoluteUrl.toString(), maxDepth, currentDepth + 1);
-                      }
-                  }
-              }
-          }
-      } catch (error) {
-          console.error("Error crawling:", error);
-      }
-  }
+            const listItem = document.createElement("li");
+            listItem.textContent = url;
+            urlList.appendChild(listItem);
+
+            pageCount++;
+            console.log("Crawled pages:", pageCount, url);
+
+            if (currentDepth < maxDepth) {
+                const links = doc.querySelectorAll("a");
+                for (const link of links) {
+                    const href = link.getAttribute("href");
+                    if (href && !href.startsWith("#") && !href.startsWith("javascript:")) {
+                        try {
+                            // Handle relative links by resolving them against the base URL
+                            const absoluteUrl = new URL(href, url);
+
+                            // Check if the resolved URL is within the base URL's scope
+                            const pathToCheck = absoluteUrl.pathname + absoluteUrl.search;
+                            if (
+                                absoluteUrl.origin === baseUrl.origin &&
+                                pathToCheck.startsWith(baseUrl.pathname)
+                            ) {
+                                crawl(absoluteUrl, maxDepth, currentDepth + 1);
+                            }
+                        } catch (error) {
+                            console.warn("Invalid URL:", href);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error crawling:", error);
+        }
+    }
 });
 
 </script>
