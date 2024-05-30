@@ -1,90 +1,117 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Crawler Visualization</title>
+  <title>Input Crawler</title>
+  <style>
+/* style.css */
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; 
+  margin-bottom: 20px; 
+}
+
+/* Adjusted styles for container and content */
+.container {
+  display: flex; /* Main container for URLs and content columns */
+}
+
+.url-column { /* New class for URL headings */
+  display: flex; /* Enable flexbox for URL headings */
+  justify-content: center; /* Center the URL within the column */
+  margin-right: 20px; /* Add space between URL columns */
+}
+
+.content-column {
+  flex: 1; /* Allow content columns to grow/shrink equally */
+  margin-top: 20px; /* Add space between URL and content */
+  white-space: pre-wrap;
+  display: flex;
+  flex-direction: column; /* Stack content vertically within the column */
+}
+
+/* Style for URL headings */
+h2 {
+  margin-bottom: 0; /* Remove default bottom margin on headings */
+}
+
+ </style>
 </head>
 <body>
-    <input type="text" id="urlInput" placeholder="Enter URL to crawl">
-    <input type="number" id="depthInput" value="1" min="1">
-    <button id="crawlButton">Crawl</button>
+  <input type="text" id="inputField1" placeholder="Enter URL 1">
+  <input type="text" id="inputField2" placeholder="Enter URL 2">
+  <button id="crawlButton">Crawl & Compare</button>
+  <div id="results" class="container"> </div>
 
-    <div id="crawlerOutput">
-        <h2>Crawled URLs:</h2>
-        <ul id="urlList"></ul>
-    </div>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const urlInput = document.getElementById("urlInput");
-    const crawlButton = document.getElementById("crawlButton");
-    const urlList = document.getElementById("urlList");
-    const depthInput = document.getElementById("depthInput");
+  <script>
+const inputField1 = document.getElementById('inputField1');
+const inputField2 = document.getElementById('inputField2');
+const crawlButton = document.getElementById('crawlButton');
+const resultsDiv = document.getElementById('results');
 
-    let pageCount = 0;
-    let baseUrl = "";
-    const visitedUrls = new Set();
-
-    crawlButton.addEventListener("click", () => {
-        pageCount = 0;
-        urlList.innerHTML = "";
-        visitedUrls.clear();
-
-        try {
-            baseUrl = new URL(urlInput.value);
-        } catch (error) {
-            console.error("Invalid URL:", error);
-            return;
-        }
-
-        const maxDepth = parseInt(depthInput.value) || 1;
-        crawl(baseUrl, maxDepth, 0);
-    });
-
-    async function crawl(url, maxDepth, currentDepth) {
-        if (currentDepth > maxDepth || visitedUrls.has(url.toString())) return;
-        visitedUrls.add(url.toString()); // Store as string for consistent comparison
-
-        try {
-            const response = await fetch(url);
-            const html = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, "text/html");
-
-            const listItem = document.createElement("li");
-            listItem.textContent = url;
-            urlList.appendChild(listItem);
-
-            pageCount++;
-            console.log("Crawled pages:", pageCount, url);
-
-            if (currentDepth < maxDepth) {
-                const links = doc.querySelectorAll("a");
-                for (const link of links) {
-                    const href = link.getAttribute("href");
-                    if (href && !href.startsWith("#") && !href.startsWith("javascript:")) {
-                        try {
-                            // Handle relative links by resolving them against the base URL
-                            const absoluteUrl = new URL(href, url);
-
-                            // Check if the resolved URL is within the base URL's scope
-                            const pathToCheck = absoluteUrl.pathname + absoluteUrl.search;
-                            if (
-                                absoluteUrl.origin === baseUrl.origin &&
-                                pathToCheck.startsWith(baseUrl.pathname)
-                            ) {
-                                crawl(absoluteUrl, maxDepth, currentDepth + 1);
-                            }
-                        } catch (error) {
-                            console.warn("Invalid URL:", href);
-                        }
-                    }
-                }
+crawlButton.addEventListener('click', async () => {
+    const url1 = inputField1.value;
+    const url2 = inputField2.value;
+  
+    try {
+      const responses = await Promise.all([fetch(url1), fetch(url2)]);
+      const htmls = await Promise.all(responses.map(res => res.text()));
+      const docs = htmls.map(html => new DOMParser().parseFromString(html, 'text/html'));
+  
+      const targetTags = docs.map(doc => 
+        Array.from(doc.querySelectorAll('p, a, div, h1, h2, h3, h4, h5, h6'))
+      );
+  
+      resultsDiv.innerHTML = '';
+  
+      for (let i = 0; i < 2; i++) {
+        const url = i === 0 ? url1 : url2;
+        const tags = targetTags[i];
+  
+        const urlHeading = document.createElement('h2');
+        urlHeading.textContent = url;
+        resultsDiv.appendChild(urlHeading);
+  
+        const contentDiv = document.createElement('div');
+        contentDiv.classList.add('content-column');
+  
+        tags.forEach((tag, index) => {
+          const otherTags = targetTags[1 - i]; // Get tags from the other URL
+          const tagText = tag.textContent.trim();
+  
+          if (tagText) {
+            const tagElement = document.createElement(tag.tagName.toLowerCase());
+            tagElement.textContent = tagText;
+  
+            if (i === 1 && otherTags[index] && otherTags[index].textContent.trim() !== tagText) { // Compare only for URL2
+              tagElement.style.color = 'red';
+            } else if (i === 1 && !otherTags[index]) { // Tag not found in URL1
+              tagElement.style.color = 'blue';
             }
-        } catch (error) {
-            console.error("Error crawling:", error);
-        }
+  
+            contentDiv.appendChild(tagElement);
+          }
+        });
+  
+        resultsDiv.appendChild(contentDiv);
+      }
+    } catch (error) {
+      resultsDiv.textContent = `Error crawling: ${error.message}`;
     }
-});
+  });
 
-</script>
+
+  </script>
 </body>
 </html>
