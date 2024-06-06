@@ -3,114 +3,81 @@
 <head>
   <title>Input Crawler</title>
   <style>
-/* style.css */
-
-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  margin: 0;
-}
-
-.input-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px; 
-  margin-bottom: 20px; 
-}
-
-/* Adjusted styles for container and content */
-.container {
-  display: flex; /* Main container for URLs and content columns */
-}
-
-.url-column { /* New class for URL headings */
-  display: flex; /* Enable flexbox for URL headings */
-  justify-content: center; /* Center the URL within the column */
-  margin-right: 20px; /* Add space between URL columns */
-}
-
-.content-column {
-  flex: 1; /* Allow content columns to grow/shrink equally */
-  margin-top: 20px; /* Add space between URL and content */
-  white-space: pre-wrap;
-  display: flex;
-  flex-direction: column; /* Stack content vertically within the column */
-}
-
-/* Style for URL headings */
-h2 {
-  margin-bottom: 0; /* Remove default bottom margin on headings */
-}
-
- </style>
+    /* ... (your existing styles) ... */
+    .url-column { display: flex; justify-content: center; margin-right: 20px; }
+    .content-column { flex: 1; margin-top: 20px; white-space: pre-wrap; display: flex; flex-direction: column; }
+    h2 { margin-bottom: 0; }
+    .error-message { color: red; margin-top: 10px; }
+  </style>
 </head>
 <body>
-  <input type="text" id="inputField1" placeholder="Enter URL 1">
-  <input type="text" id="inputField2" placeholder="Enter URL 2">
-  <button id="crawlButton">Crawl & Compare</button>
-  <div id="results" class="container"> </div>
+  <div class="input-container">
+    <input type="text" id="inputField1" placeholder="Enter URL 1">
+    <input type="text" id="inputField2" placeholder="Enter URL 2">
+  </div>
 
-  <script>
-const inputField1 = document.getElementById('inputField1');
+  <button id="crawlButton">Crawl & Compare</button>
+  <div id="results" class="container"></div>
+  <div id="error-message" class="error-message"></div> <script>
+    const inputField1 = document.getElementById('inputField1');
 const inputField2 = document.getElementById('inputField2');
 const crawlButton = document.getElementById('crawlButton');
 const resultsDiv = document.getElementById('results');
+const errorMessageDiv = document.getElementById('error-message');
 
 crawlButton.addEventListener('click', async () => {
     const url1 = inputField1.value;
     const url2 = inputField2.value;
-  
+    
     try {
-      const responses = await Promise.all([fetch(url1), fetch(url2)]);
-      const htmls = await Promise.all(responses.map(res => res.text()));
-      const docs = htmls.map(html => new DOMParser().parseFromString(html, 'text/html'));
-  
-      const targetTags = docs.map(doc => 
-        Array.from(doc.querySelectorAll('p, a, div, h1, h2, h3, h4, h5, h6'))
-      );
-  
-      resultsDiv.innerHTML = '';
-  
-      for (let i = 0; i < 2; i++) {
-        const url = i === 0 ? url1 : url2;
-        const tags = targetTags[i];
-  
-        const urlHeading = document.createElement('h2');
-        urlHeading.textContent = url;
-        resultsDiv.appendChild(urlHeading);
-  
-        const contentDiv = document.createElement('div');
-        contentDiv.classList.add('content-column');
-  
-        tags.forEach((tag, index) => {
-          const otherTags = targetTags[1 - i]; // Get tags from the other URL
-          const tagText = tag.textContent.trim();
-  
-          if (tagText) {
-            const tagElement = document.createElement(tag.tagName.toLowerCase());
-            tagElement.textContent = tagText;
-  
-            if (i === 1 && otherTags[index] && otherTags[index].textContent.trim() !== tagText) { // Compare only for URL2
-              tagElement.style.color = 'red';
-            } else if (i === 1 && !otherTags[index]) { // Tag not found in URL1
-              tagElement.style.color = 'blue';
-            }
-  
-            contentDiv.appendChild(tagElement);
-          }
-        });
-  
-        resultsDiv.appendChild(contentDiv);
-      }
-    } catch (error) {
-      resultsDiv.textContent = `Error crawling: ${error.message}`;
-    }
-  });
+        const responses = await Promise.all([fetch(url1), fetch(url2)]);
+        const htmls = await Promise.all(responses.map(res => res.text()));
+        const docs = htmls.map(html => new DOMParser().parseFromString(html, 'text/html'));
 
+        const targetTags = docs.map(doc => Array.from(doc.querySelectorAll('p, a, div, h1, h2, h3, h4, h5, h6')));
+
+        const url1TagTexts = targetTags[0].map(tag => tag.textContent.trim());
+        const url2TagTexts = targetTags[1].map(tag => tag.textContent.trim());
+
+        resultsDiv.innerHTML = '';
+
+        for (let i = 0; i < 2; i++) {
+            const url = i === 0 ? url1 : url2;
+            const tags = targetTags[i];
+            const tagTexts = i === 0 ? url1TagTexts : url2TagTexts;
+            const otherTagTexts = i === 0 ? url2TagTexts : url1TagTexts;
+
+            const urlHeading = document.createElement('div');
+            urlHeading.classList.add("url-column");
+            urlHeading.innerHTML = `<h2>${url}</h2>`; // Use innerHTML here
+            resultsDiv.appendChild(urlHeading);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('content-column');
+
+            tags.forEach((tag, index) => {
+                const tagText = tagTexts[index];
+                if (tagText) {
+                    const tagElement = document.createElement(tag.tagName.toLowerCase());
+                    tagElement.textContent = tagText;
+                    // Compare tagTexts (instead of DOM elements)
+                    if (i === 1 && tagTexts.includes(tagText) && otherTagTexts.includes(tagText) && tagText !== otherTagTexts[otherTagTexts.indexOf(tagText)]) {
+                        tagElement.style.color = 'red'; // Different content, same tag
+                    } else if (i === 1 && !otherTagTexts.includes(tagText)) {
+                        tagElement.style.color = 'blue'; // Tag not found in other URL
+                    }
+
+                    contentDiv.appendChild(tagElement);
+                }
+            });
+
+            resultsDiv.appendChild(contentDiv);
+        }
+        
+    } catch (error) {
+        errorMessageDiv.textContent = `Error crawling: ${error.message}`;
+    }
+});
 
   </script>
 </body>
